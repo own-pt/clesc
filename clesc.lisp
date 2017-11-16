@@ -38,7 +38,6 @@ ORDER-DIRECTION is either asc or desc."
               (yason:with-object-element ("terms")
                 (yason:with-object ()
                   (yason:encode-object-element "field" field)
-                  (yason:encode-object-element "size" 0)
                   (when (and order-field order-dir)
                     (yason:with-object-element ("order")
                       (yason:with-object ()
@@ -48,18 +47,26 @@ ORDER-DIRECTION is either asc or desc."
   "Check if text is a wildcard; that is, it is either empty or '*'."
   (or (emptyp text) (equal "*" text)))
 
-(defun query-match (text)
+(defun query-match (search-field texts)
   "Create a MATCH fragment for TEXT; if text is wildcard, as defined
  by WILDCARD?, it is simply match_all, otherwise is a match against
  all fields (_all)."
-  (yason:with-object ()
-    (if (wildcard? text)
-        (yason:with-object-element ("match_all")
-          (yason:with-object ()
-            (yason:encode-object-element "boost" 1.0)))
-        (yason:with-object-element ("match")
-          (yason:with-object ()
-            (yason:encode-object-element "_all" text))))))
+  (if (wildcard? texts)
+      (yason:with-object ()
+	(yason:with-object-element ("match_all")
+	 (yason:with-object ()
+	   (yason:encode-object-element "boost" 1.0))))
+      (if (not (listp texts))
+	  (yason:with-object ()
+	    (yason:with-object-element ("match")
+	     (yason:with-object ()
+	       (yason:encode-object-element (if (not search-field) "_all" search-field) texts))))
+	  (yason:with-array ()
+	    (loop for text in texts for field in search-field do
+		 (yason:with-object ()
+		   (yason:with-object-element ("match")
+		    (yason:with-object ()
+		      (yason:encode-object-element field text)))))))))
 
 (defun query-terms (terms)
   "Create a field query for TERMS."
@@ -77,7 +84,7 @@ ORDER-DIRECTION is either asc or desc."
     :accessor query-error-message
     :initform nil)))
 
-(defun query-search (&key text terms agg-fields fields-order from (size 25))
+(defun query-search (&key text terms agg-fields fields-order from search-field (size 25))
   "Creates the final query given a text to be matched, terms,
 optionally aggregating certain fields."
   (yason:with-output-to-string* (:indent t)
@@ -93,7 +100,7 @@ optionally aggregating certain fields."
           (yason:with-object-element ("bool")
             (yason:with-object ()
               (yason:with-object-element ("must")
-                (query-match text))
+                (query-match search-field text))
               (when terms (query-terms terms))))))
       (if fields-order
         (dolist (field-info fields-order)
@@ -157,11 +164,11 @@ given index and type."
 (defun es/delete (index type id)
   (call-es (format nil "/~a/~a/~a" index type id) :method :delete))
 
-(defun es/search (index &key text terms facets fields-order from size)
+(defun es/search (index &key text search-field terms facets fields-order from size)
   (call-es (search/index index)
            :method :post
            :content (query-search :from from :size size
-                                  :text text :terms terms :agg-fields facets :fields-order fields-order)))
+                                  :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order)))
 
 (defun call-es (cmd &key (method :get) (content nil))
   (when *debug-query-dsl*
