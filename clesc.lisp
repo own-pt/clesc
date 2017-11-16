@@ -48,9 +48,13 @@ ORDER-DIRECTION is either asc or desc."
   (or (emptyp text) (equal "*" text)))
 
 (defun query-match (search-field texts)
-  "Create a MATCH fragment for TEXT; if text is wildcard, as defined
- by WILDCARD?, it is simply match_all, otherwise is a match against
- all fields (_all)."
+  "When texts and search-field are strings: Create a MATCH fragment for TEXT;
+ if text is wildcard, as defined by WILDCARD?, it is simply match_all otherwise,
+ if search-field is not empty is a match against the specified field, else is a
+ match against  all fields (_all).
+  When texts and search-field are lists (they have to be the same length):
+ Create a composition of MATCH queries, that each MATCH query is the nth texts element
+ against the nth search-field element"
   (if (wildcard? texts)
       (yason:with-object ()
 	(yason:with-object-element ("match_all")
