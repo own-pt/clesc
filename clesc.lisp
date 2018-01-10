@@ -182,7 +182,8 @@ given index and type."
 		 :method method
                  :content content
 		 :external-format-out :utf-8
-		 :want-stream t)))
+		 :want-stream t
+		 :content-type "application/json")))
     (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
     (let ((obj (yason:parse stream)))
       (close stream)
