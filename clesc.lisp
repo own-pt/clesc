@@ -174,6 +174,9 @@ given index and type."
            :content (query-search :from from :size size
                                   :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order)))
 
+(defun es/mapping (index json)
+  (call-es index :method :put :content (alexandria.0.dev:read-file-into-string json)))
+
 (defun call-es (cmd &key (method :get) (content nil))
   (when *debug-query-dsl*
     (format *debug-io* "[~a ~a]~%" cmd content))
