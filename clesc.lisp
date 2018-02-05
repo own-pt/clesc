@@ -22,26 +22,38 @@
   (with-output-to-string (s)
     (yason:encode hash-table s)))
 
-(defun query-aggregation (fields)
+(defun query-aggregation (fields agg-nested)
   "Create an aggregation over FIELDS.  Each elements of the list is a
 triple (FIELD ORDER-FIELD ORDER-DIRECTION), where FIELD is the field
 name, ORDER-FIELD is the type of ordering (e.g., _term or _count) and
 ORDER-DIRECTION is either asc or desc."
   (yason:with-object-element ("aggs")
     (yason:with-object ()
-      (dolist (field-triple fields)
-        (let ((field (if (listp field-triple) (first field-triple) field-triple))
-              (order-field (if (listp field-triple) (second field-triple) nil))
-              (order-dir (if (listp field-triple) (third field-triple) nil)))
-          (yason:with-object-element (field)
-            (yason:with-object ()
-              (yason:with-object-element ("terms")
-                (yason:with-object ()
-                  (yason:encode-object-element "field" field)
-                  (when (and order-field order-dir)
-                    (yason:with-object-element ("order")
-                      (yason:with-object ()
-                        (yason:encode-object-element order-field order-dir)))))))))))))
+     (let ((agg (aux-agg fields))
+	   (agg-nested  (aux-agg-nested agg-nested)))
+       (cond ((and agg agg-nested) (append agg agg-nested))
+	     (t agg))))))
+
+
+(defun aux-agg (fields)
+  (when fields
+    (dolist (field-triple fields)
+      (let ((field (if (listp field-triple) (first field-triple) field-triple))
+	    (order-field (if (listp field-triple) (second field-triple) nil))
+	    (order-dir (if (listp field-triple) (third field-triple) nil)))
+	(yason:with-object-element (field)
+	  (yason:with-object ()
+	    (yason:with-object-element ("terms")
+	      (yason:with-object ()
+		(yason:encode-object-element "field" field)
+		(when (and order-field order-dir)
+		  (yason:with-object-element ("order")
+		    (yason:with-object ()
+		      (yason:encode-object-element order-field order-dir))))))))))))
+
+(defun aux-agg-nested (agg-nested)
+  (when agg-nested
+    (funcall agg-nested)))
 
 (defun wildcard? (text)
   "Check if text is a wildcard; that is, it is either empty or '*'."
@@ -88,13 +100,13 @@ ORDER-DIRECTION is either asc or desc."
     :accessor query-error-message
     :initform nil)))
 
-(defun query-search (&key text terms agg-fields fields-order from search-field (size 25))
+(defun query-search (&key text terms agg-fields agg-nested fields-order from search-field (size 25) must-nested)
   "Creates the final query given a text to be matched, terms,
 optionally aggregating certain fields."
   (yason:with-output-to-string* (:indent t)
     (yason:with-object ()
-      (when agg-fields
-        (query-aggregation agg-fields))
+      (when (or agg-fields agg-nested)
+        (query-aggregation agg-fields agg-nested))
       (when size
         (yason:encode-object-element "size" size))
       (when from
@@ -168,11 +180,12 @@ given index and type."
 (defun es/delete (index type id)
   (call-es (format nil "/~a/~a/~a" index type id) :method :delete))
 
-(defun es/search (index &key text search-field terms facets fields-order from size)
+(defun es/search (index &key text search-field terms facets fields-order from size agg-nested must-nested)
   (call-es (search/index index)
            :method :post
            :content (query-search :from from :size size
-                                  :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order)))
+                                  :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order
+				  :agg-nested agg-nested :must-nested must-nested)))
 
 (defun es/mapping (index json)
   (call-es index :method :put :content (alexandria.0.dev:read-file-into-string json)))
