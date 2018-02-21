@@ -15,7 +15,7 @@
 (defpackage #:clesc
   (:use #:cl #:yason #:drakma #:alexandria)
   (:export #:aggregate #:type-mappings 
-           #:es/refresh #:es/aggregate #:es/add
+           #:es/refresh #:es/aggregate #:es/add #:es/mapping
            #:es/update #:es/get #:es/delete #:es/search))
 
 
