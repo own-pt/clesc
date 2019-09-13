@@ -196,7 +196,7 @@ given index and type."
 
 (defun es/mapping (index json)
   "Creates an mapping. This function expects an index and the path to a JSON file with the mapping."
-  (call-es index :method :put :content (alexandria.0.dev:read-file-into-string json)))
+  (call-es index :method :put :content (alexandria:read-file-into-string json)))
 
 (defun call-es (cmd &key (method :get) (content nil))
   (when *debug-query-dsl*
