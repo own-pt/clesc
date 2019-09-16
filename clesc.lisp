@@ -18,6 +18,10 @@
 
 (defparameter *debug-query-dsl* nil)
 
+(defparameter *es-authentication* nil
+  "A list each the first element is the user and the second is the
+password." )
+
 (defun encode-to-string (hash-table)
   (with-output-to-string (s)
     (yason:encode hash-table s)))
@@ -207,7 +211,8 @@ given index and type."
                  :content content
 		 :external-format-out :utf-8
 		 :want-stream t
-		 :content-type "application/json")))
+		 :content-type "application/json"
+		 :basic-authorization *es-authentication*)))
     (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
     (let ((obj (yason:parse stream)))
       (close stream)
