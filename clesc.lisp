@@ -104,7 +104,13 @@ ORDER-DIRECTION is either asc or desc."
     :accessor query-error-message
     :initform nil)))
 
-(defun query-search (&key text terms agg-fields agg-nested fields-order from search-field (size 25) must-nested extra)
+(defun query-string (string)
+  (yason:with-object ()
+    (yason:with-object-element ("query_string")
+      (yason:with-object ()
+	(yason:encode-object-element "query" string))) ))
+
+(defun query-search (&key text string terms agg-fields agg-nested fields-order from search-field (size 25) must-nested extra)
   "Creates the final query given a text to be matched, terms,
 optionally aggregating certain fields."
   (yason:with-output-to-string* (:indent t)
@@ -120,12 +126,11 @@ optionally aggregating certain fields."
           (yason:with-object-element ("bool")
             (yason:with-object ()
               (yason:with-object-element ("must")
-                (if (not must-nested)
-		    (query-match search-field text)
-		    (yason:with-array ()
-		      (list
-		       (query-match search-field text)
-		       (funcall must-nested)))))
+                (yason:with-array ()
+		  (append
+		   (if (or text (not (or string must-nested))) (list (query-match search-field text)))
+		   (if string (list (query-string string)))
+		   (if must-nested (list (funcall must-nested))))))
               (when terms (query-terms terms))))))
       (if fields-order
         (dolist (field-info fields-order)
@@ -191,10 +196,10 @@ given index and type."
 (defun es/delete (index type id)
   (call-es (format nil "/~a/~a/~a" index type id) :method :delete))
 
-(defun es/search (index &key text search-field terms facets fields-order from size agg-nested must-nested extra)
+(defun es/search (index &key text search-field string terms facets fields-order from size agg-nested must-nested extra)
   (call-es (search/index index)
            :method :post
-           :content (query-search :from from :size size
+           :content (query-search :from from :size size :string string
                                   :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order
 				  :agg-nested agg-nested :must-nested must-nested :extra extra)))
 
