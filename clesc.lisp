@@ -179,11 +179,13 @@ given index and type."
            (gethash field
                     (gethash "aggregations" (%aggregate index type field order-field order-direction)))))
 
-(defun es/add (index type doc &key id)
+(defun es/add (index type doc &key id refresh)
   (let ((url (if id
                  (format nil "/~a/~a/~a" index type id)
                  (format nil "/~a/~a/" index type))))
-    (call-es url :method :post :content (encode-to-string doc))))
+    (call-es url :method :post :content (encode-to-string doc)
+	     :parameters (and refresh
+			      `(("refresh" . ,refresh))))))
 
 (defun es/update (index type id doc)
   (let ((update (make-hash-table :test #'equal)))
