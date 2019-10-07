@@ -132,11 +132,11 @@ optionally aggregating certain fields."
 		   (if string (list (query-string string)))
 		   (if must-nested (list (funcall must-nested))))))
               (when terms (query-terms terms))))))
-      (if fields-order
+      (when fields-order
         (dolist (field-info fields-order)
           (let ((name-field (if (listp field-info) (first field-info) nil))
                 (order-field (if (listp field-info) (second field-info) nil)))
-               (if (and (not (eq name-field nil)) (not (eq order-field nil)))
+               (when (and name-field order-field)
                 (yason:with-object-element ("sort")
                   (yason:with-object ()
                     (yason:with-object-element (name-field)
@@ -193,8 +193,10 @@ given index and type."
 (defun es/get (index type id)
   (call-es (format nil "/~a/~a/~a" index type id) :method :get))
 
-(defun es/delete (index type id)
-  (call-es (format nil "/~a/~a/~a" index type id) :method :delete))
+(defun es/delete (index type id &key refresh)
+  (call-es (format nil "/~a/~a/~a" index type id) :method :delete
+	   :parameters (and refresh
+			    `(("refresh" . ,refresh)))))
 
 (defun es/search (index &key text search-field string terms facets fields-order from size agg-nested must-nested extra)
   (call-es (search/index index)
@@ -207,13 +209,14 @@ given index and type."
   "Creates an mapping. This function expects an index and the path to a JSON file with the mapping."
   (call-es index :method :put :content (alexandria:read-file-into-string json)))
 
-(defun call-es (cmd &key (method :get) (content nil))
+(defun call-es (cmd &key (method :get) content parameters)
   (when *debug-query-dsl*
     (format *debug-io* "[~a ~a]~%" cmd content))
   (let ((stream (drakma:http-request
 		 (format nil "~a~a" *es-endpoint* cmd)
 		 :method method
                  :content content
+		 :parameters parameters
 		 :external-format-out :utf-8
 		 :want-stream t
 		 :content-type "application/json"
