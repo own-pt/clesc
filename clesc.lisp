@@ -26,20 +26,20 @@ password." )
   (with-output-to-string (s)
     (yason:encode hash-table s)))
 
-(defun query-aggregation (fields agg-nested)
+(defun query-aggregation (fields agg-size agg-nested)
   "Create an aggregation over FIELDS.  Each elements of the list is a
 triple (FIELD ORDER-FIELD ORDER-DIRECTION), where FIELD is the field
 name, ORDER-FIELD is the type of ordering (e.g., _term or _count) and
 ORDER-DIRECTION is either asc or desc."
   (yason:with-object-element ("aggs")
     (yason:with-object ()
-     (let ((agg (aux-agg fields))
+     (let ((agg (aux-agg fields agg-size))
 	   (agg-nested  (aux-agg-nested agg-nested)))
        (cond ((and agg agg-nested) (append agg agg-nested))
 	     (t agg))))))
 
 
-(defun aux-agg (fields)
+(defun aux-agg (fields agg-size)
   (when fields
     (dolist (field-triple fields)
       (let ((field (if (listp field-triple) (first field-triple) field-triple))
@@ -50,6 +50,8 @@ ORDER-DIRECTION is either asc or desc."
 	    (yason:with-object-element ("terms")
 	      (yason:with-object ()
 		(yason:encode-object-element "field" field)
+		(when agg-size
+		    (yason:encode-object-element "size" agg-size))
 		(when (and order-field order-dir)
 		  (yason:with-object-element ("order")
 		    (yason:with-object ()
@@ -110,13 +112,13 @@ ORDER-DIRECTION is either asc or desc."
       (yason:with-object ()
 	(yason:encode-object-element "query" string))) ))
 
-(defun query-search (&key text string terms agg-fields agg-nested fields-order from search-field (size 25) must-nested extra)
+(defun query-search (&key text string terms agg-fields agg-size agg-nested fields-order from search-field (size 25) must-nested extra)
   "Creates the final query given a text to be matched, terms,
 optionally aggregating certain fields."
   (yason:with-output-to-string* (:indent t)
     (yason:with-object ()
       (when (or agg-fields agg-nested)
-        (query-aggregation agg-fields agg-nested))
+        (query-aggregation agg-fields agg-size agg-nested))
       (when size
         (yason:encode-object-element "size" size))
       (when from
@@ -200,12 +202,12 @@ given index and type."
 	   :parameters (and refresh
 			    `(("refresh" . ,refresh)))))
 
-(defun es/search (index &key text search-field string terms facets fields-order from size agg-nested must-nested extra)
+(defun es/search (index &key text search-field string terms facets agg-size fields-order from size agg-nested must-nested extra)
   (call-es (search/index index)
            :method :post
            :content (query-search :from from :size size :string string
-                                  :text text :search-field search-field :terms terms :agg-fields facets :fields-order fields-order
-				  :agg-nested agg-nested :must-nested must-nested :extra extra)))
+                                  :text text :search-field search-field :terms terms :agg-fields facets :agg-size agg-size
+				  :fields-order fields-order :agg-nested agg-nested :must-nested must-nested :extra extra)))
 
 (defun es/mapping (index json)
   "Creates an mapping. This function expects an index and the path to a JSON file with the mapping."
